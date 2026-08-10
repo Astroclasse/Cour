@@ -1,0 +1,9 @@
+{
+  "name": "revisapp-netlify",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^10.7.8",
+    "@netlify/functions": "^5.3.0"
+  }
+}
