@@ -1,0 +1,7 @@
+{
+  "name": "revisapp-vercel",
+  "private": true,
+  "dependencies": {
+    "@vercel/blob": "^2.7.0"
+  }
+}
