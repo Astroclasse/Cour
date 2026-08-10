@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestionnaire de Fichiers - Vercel Blob</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { max-width: 800px; margin: 40px auto; padding: 0 20px; background: #f4f5f7; color: #333; }
+    h1 { text-align: center; color: #111; }
+    h2 { margin-top: 0; }
+    .card { background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
+    input[type="text"], select, input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    button { background: #0070f3; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; transition: background 0.2s; }
+    button:hover { background: #0051a2; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
+    .file-item:last-child { border-bottom: none; }
+    .file-info { display: flex; flex-direction: column; gap: 4px; }
+    .file-title { font-weight: 600; font-size: 15px; }
+    .file-meta { font-size: 12px; color: #666; }
+    .btn-delete { background: #e53e3e; padding: 6px 12px; width: auto; font-size: 12px; }
+    .btn-delete:hover { background: #c53030; }
+    .badge { display: inline-block; padding: 2px 8px; background: #e2e8f0; border-radius: 12px; font-size: 11px; text-transform: uppercase; margin-left: 6px; }
+    #status { margin-top: 12px; font-size: 14px; text-align: center; font-weight: 600; }
+    .error { color: #e53e3e; }
+    .success { color: #38a169; }
+  </style>
+</head>
+<body>
+
+  <h1>Stockage Vercel Blob</h1>
+
+  <!-- Formulaire d'upload -->
+  <div class="card">
+    <h2>Envoyer un fichier</h2>
+    <form id="uploadForm">
+      <div class="form-group">
+        <label for="fileInput">Fichier (.doc, .docx, .pdf, .txt, .ppt, .pptx, .mp3 - max 4 Mo)</label>
+        <input type="file" id="fileInput" required>
+      </div>
+      <div class="form-group">
+        <label for="titleInput">Titre / Description</label>
+        <input type="text" id="titleInput" placeholder="Ex: Rapport de réunion">
+      </div>
+      <div class="form-group">
+        <label for="categorySelect">Catégorie</label>
+        <select id="categorySelect">
+          <option value="document">Document</option>
+          <option value="audio">Audio</option>
+          <option value="presentation">Présentation</option>
+          <option value="autre" selected>Autre</option>
+        </select>
+      </div>
+      <button type="submit" id="submitBtn">Envoyer le fichier</button>
+      <div id="status"></div>
+    </form>
+  </div>
+
+  <!-- Liste des fichiers -->
+  <div class="card">
+    <h2>Fichiers enregistrés</h2>
+    <div id="fileList">Chargement des fichiers...</div>
+  </div>
+
+  <script>
+    const API_URL = "/api/files";
+
+    function formatBytes(bytes) {
+      if (!bytes) return "0 Octets";
+      const k = 1024;
+      const sizes = ["Octets", "Ko", "Mo", "Go"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    }
+
+    async function loadFiles() {
+      const listContainer = document.getElementById("fileList");
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error("Erreur lors du chargement des fichiers.");
+        const files = await res.json();
+
+        if (files.length === 0) {
+          listContainer.innerHTML = "<p>Aucun fichier disponible.</p>";
+          return;
+        }
+
+        listContainer.innerHTML = files.map(file => `
+          <div class="file-item">
+            <div class="file-info">
+              <span class="file-title">
+                <a href="${file.url}" target="_blank">${file.title || file.name}</a>
+                <span class="badge">${file.category}</span>
+              </span>
+              <span class="file-meta">
+                ${file.name} • ${formatBytes(file.size)} • ${new Date(file.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+            <button class="btn-delete" onclick="deleteFile('${file.key}')">Supprimer</button>
+          </div>
+        `).join("");
+      } catch (err) {
+        listContainer.innerHTML = `<p class="error">${err.message}</p>`;
+      }
+    }
+
+    document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const fileInput = document.getElementById("fileInput");
+      const titleInput = document.getElementById("titleInput");
+      const categorySelect = document.getElementById("categorySelect");
+      const submitBtn = document.getElementById("submitBtn");
+      const status = document.getElementById("status");
+
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      submitBtn.disabled = true;
+      status.className = "";
+      status.textContent = "Téléversement binaire en cours...";
+
+      try {
+        const query = new URLSearchParams({
+          filename: file.name,
+          title: titleInput.value,
+          category: categorySelect.value
+        });
+
+        const res = await fetch(`${API_URL}?${query.toString()}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": file.type || "application/octet-stream"
+          },
+          body: file
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Échec du téléversement.");
+
+        status.className = "success";
+        status.textContent = "Fichier envoyé avec succès !";
+        
+        fileInput.value = "";
+        titleInput.value = "";
+        loadFiles();
+      } catch (err) {
+        status.className = "error";
+        status.textContent = err.message;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    async function deleteFile(key) {
+      if (!confirm("Voulez-vous vraiment supprimer ce fichier ?")) return;
+
+      try {
+        const res = await fetch(`${API_URL}?key=${encodeURIComponent(key)}`, {
+          method: "DELETE"
+        });
+        if (!res.ok) throw new Error("Échec de la suppression.");
+        loadFiles();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    loadFiles();
+  </script>
+</body>
+</html>
