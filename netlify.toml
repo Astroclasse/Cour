@@ -1,0 +1,21 @@
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# La Function déclare déjà ses routes via `config.path` dans files.mjs,
+# mais ces redirects sont ajoutés en filet de sécurité (utile si jamais
+# le routing par "path" n'est pas pris en compte selon la config du site).
+[[redirects]]
+  from = "/api/files"
+  to = "/.netlify/functions/files"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/files/*"
+  to = "/.netlify/functions/files/:splat"
+  status = 200
+  force = true
