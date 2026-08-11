@@ -14,6 +14,6 @@ function password(event) {
     } else {
         lu.style.color = "red";
         me.textContent = "Numéro d'auth incorect .";
-        window.location.href = "index2.html";
+        window.location.href = "index.html";
     }
 } 
